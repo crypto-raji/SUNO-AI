@@ -1,13 +1,13 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SettingsForm from "@/components/settings/SettingsForm";
+import AuthRedirect from "@/components/auth/AuthRedirect";
 
 export default async function SettingsPage() {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) return <AuthRedirect to="/login" />;
 
   const { data: profile } = await supabase
     .from("profiles")
