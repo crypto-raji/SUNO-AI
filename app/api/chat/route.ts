@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { completeWithAI } from "@/lib/services/ai";
 import { isMaintenanceMode } from "@/lib/services/maintenance";
+import { ensureUserProfile } from "@/lib/supabase/profile";
 import type { Mode } from "@/lib/types/database";
 
 const SYSTEM_PROMPTS: Record<Mode, string> = {
@@ -84,6 +85,29 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Ensure profile and session exist in database so foreign keys do not fail
+  await ensureUserProfile(supabase, user);
+
+  // Check if session exists; if not, create it
+  const { data: sessionExists } = await supabase
+    .from("sessions")
+    .select("id")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (!sessionExists) {
+    try {
+      await supabase.from("sessions").upsert({
+        id: sessionId,
+        user_id: user.id,
+        mode,
+        title: message.slice(0, 40) || "New conversation",
+      });
+    } catch {
+      // Non-blocking fallback
+    }
+  }
+
   // Save the user message
   const { error: userMsgError } = await supabase.from("messages").insert({
     session_id: sessionId,
@@ -103,14 +127,21 @@ export async function POST(req: NextRequest) {
     .order("created_at", { ascending: true })
     .limit(20);
 
+  // Construct message array, guaranteeing the user's current message is ALWAYS included
+  let chatMessages = (history ?? []).map((h) => ({
+    role: h.role as "user" | "assistant",
+    content: h.content,
+  }));
+
+  if (chatMessages.length === 0 || !chatMessages.some((m) => m.content === message)) {
+    chatMessages.push({ role: "user", content: message });
+  }
+
   try {
     const result = await completeWithAI(
       {
         system: (SYSTEM_PROMPTS[mode] ?? SYSTEM_PROMPTS.general) + documentContext,
-        messages: (history ?? []).map((h) => ({
-          role: h.role as "user" | "assistant",
-          content: h.content,
-        })),
+        messages: chatMessages,
         maxTokens: 500,
       },
       { userId: user.id }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { completeWithAI } from "@/lib/services/ai";
+import { ensureUserProfile } from "@/lib/supabase/profile";
 import type { Mode } from "@/lib/types/database";
 
 async function generateTitle(seed: string, userId: string): Promise<string> {
@@ -28,6 +29,8 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  await ensureUserProfile(supabase, user);
+
   const { mode, seed } = (await req.json()) as { mode: Mode; seed?: string };
 
   const title = seed ? await generateTitle(seed, user.id) : "New conversation";
@@ -39,6 +42,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
+    console.error("[/api/sessions POST] Insert error:", error);
     return NextResponse.json({ error: "Couldn't start a new conversation. Please try again." }, { status: 500 });
   }
 
