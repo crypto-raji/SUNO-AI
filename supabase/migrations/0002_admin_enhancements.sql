@@ -56,36 +56,53 @@ create policy "admin_audit_logs_insert_admins" on admin_audit_logs
 -- ============================================================
 -- AUTO-GENERATE PERMANENT AVATAR ON NEW USER CREATION
 -- ============================================================
-create or replace function handle_new_user()
-returns trigger as $$
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   raw_username text;
   final_username text;
   final_avatar text;
+  final_name text;
 begin
-  raw_username := coalesce(
-    new.raw_user_meta_data->>'username',
-    split_part(new.email, '@', 1)
+  -- 1. Determine Display Name
+  final_name := coalesce(
+    new.raw_user_meta_data->>'name',
+    new.raw_user_meta_data->>'full_name',
+    split_part(coalesce(new.email, ''), '@', 1),
+    'User'
   );
 
-  -- Ensure username uniqueness for OAuth signups
+  -- 2. Determine base username
+  raw_username := coalesce(
+    nullif(trim(new.raw_user_meta_data->>'username'), ''),
+    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+    'user_' || substr(replace(new.id::text, '-', ''), 1, 6)
+  );
+
+  -- 3. Ensure username uniqueness for OAuth and email signups
   if exists (select 1 from public.profiles where username = raw_username and id <> new.id) then
     final_username := raw_username || '_' || substr(replace(new.id::text, '-', ''), 1, 4);
   else
     final_username := raw_username;
   end if;
 
+  -- 4. Determine avatar (built-in md5 requires no external extension)
   final_avatar := coalesce(
-    new.raw_user_meta_data->>'avatar_url',
-    new.raw_user_meta_data->>'picture',
-    'https://api.dicebear.com/7.x/identicon/svg?seed=' || encode(digest(new.id::text, 'sha256'), 'hex')
+    nullif(new.raw_user_meta_data->>'avatar_url', ''),
+    nullif(new.raw_user_meta_data->>'picture', ''),
+    'https://api.dicebear.com/7.x/identicon/svg?seed=' || md5(new.id::text)
   );
 
+  -- 5. Insert or update profile
   insert into public.profiles (id, email, name, username, avatar_url)
   values (
     new.id,
-    new.email,
-    coalesce(new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'full_name'),
+    coalesce(new.email, new.id::text || '@placeholder.internal'),
+    final_name,
     final_username,
     final_avatar
   )
@@ -96,4 +113,5 @@ begin
 
   return new;
 end;
-$$ language plpgsql security definer;
+$$;
+

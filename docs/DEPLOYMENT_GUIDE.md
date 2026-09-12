@@ -1,6 +1,8 @@
 # 🚀 Sona AI — Production Deployment Guide
 
-> **Step-by-step instructions for deploying Sona AI on Vercel and Supabase Cloud.**
+> **Deploy Sona AI to Railway (Recommended for AI Speech-to-Speech & WebSockets) or Vercel & Supabase Cloud.**
+>
+> 💡 *For persistent Node.js runtime with full speech-to-speech audio streaming and zero serverless execution timeouts, follow the [Railway Deployment Guide](file:///Users/japheth/Documents/sona-ai/docs/RAILWAY_DEPLOYMENT_GUIDE.md).*
 
 ---
 
@@ -11,10 +13,19 @@
 3. Open the **SQL Editor** in your Supabase dashboard and run the migrations in sequence:
    - Run `supabase/migrations/0001_init.sql`
    - Run `supabase/migrations/0002_admin_enhancements.sql`
-4. Under **Authentication → Providers**:
+4. Under **Authentication → URL Configuration**:
+   - **Site URL**: `https://your-production-domain.vercel.app` (or your custom domain)
+   - **Redirect URLs (Allow list)**:
+     - `https://your-production-domain.vercel.app/**`
+     - `https://your-production-domain.vercel.app/auth/callback`
+     - `http://localhost:3000/**` (for local development)
+5. Under **Authentication → Providers**:
    - Ensure **Email** is enabled.
-   - (Optional) Enable **Google OAuth** by providing your Google Client ID and Secret.
-5. Under **Storage**:
+   - For **Google OAuth**:
+     - In **Google Cloud Console** (Credentials → OAuth 2.0 Client IDs), set **Authorized redirect URI** to Supabase's callback URL:
+       `https://<YOUR_SUPABASE_PROJECT_REF>.supabase.co/auth/v1/callback`
+     - In **Supabase Dashboard** (Authentication → Providers → Google), paste your **Google Client ID** and **Google Client Secret**.
+6. Under **Storage**:
    - Verify the `documents` and `audio` buckets are created as private buckets.
 
 ---
