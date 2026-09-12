@@ -81,3 +81,7 @@ ON documents (session_id, created_at DESC);
 
 ### 3. Serverless Edge Middleware
 - Route protection and maintenance mode checks are executed at the Next.js Edge Middleware layer, preventing unauthorized or unauthenticated requests from consuming origin server compute or database resources.
+
+### 4. Zero Vercel Image Optimizer Overhead
+- `next.config.js` is configured with `images.unoptimized: true`.
+- All images (avatars, previews, logos) are served directly via high-speed global CDN/static delivery without invoking Vercel's serverless image optimization function, guaranteeing instant rendering, zero serverless cold starts, and eliminating image transformation usage limits.
