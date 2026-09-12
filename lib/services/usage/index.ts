@@ -1,6 +1,6 @@
 import { serviceClient } from "@/lib/supabase/server";
 
-export type UsageService = "ai_groq" | "ai_anthropic" | "tts" | "stt_assemblyai";
+export type UsageService = "ai_groq" | "ai_anthropic" | "tts" | "stt_assemblyai" | "stt_groq";
 
 export async function logUsage(params: {
   userId: string;
