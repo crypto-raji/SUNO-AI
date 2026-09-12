@@ -124,9 +124,46 @@ export default function Composer({
   const startVoiceInput = async () => {
     if (typeof window === "undefined") return;
 
-    audioChunksRef.current = [];
+    // 1. Fast Path: Use native SpeechRecognition for instant zero-latency live typing
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    // 1. Request microphone stream (universal across iOS, Android, Desktop)
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "en-US";
+
+        recognition.onstart = () => setIsListening(true);
+        recognition.onend = () => setIsListening(false);
+        recognition.onerror = (e: any) => {
+          if (e.error !== "no-speech") {
+            setIsListening(false);
+          }
+        };
+
+        recognition.onresult = (event: any) => {
+          let fullTranscript = "";
+          for (let i = 0; i < event.results.length; ++i) {
+            fullTranscript += event.results[i][0].transcript + " ";
+          }
+          const clean = fullTranscript.trim();
+          if (clean) {
+            setText(clean);
+          }
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+        return;
+      } catch (err) {
+        console.warn("[Composer] SpeechRecognition init failed, falling back to MediaRecorder:", err);
+      }
+    }
+
+    // 2. Fallback Path: MediaRecorder with ultra-fast Groq Whisper (English enforced)
+    audioChunksRef.current = [];
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -137,7 +174,6 @@ export default function Composer({
       });
       streamRef.current = stream;
 
-      // Determine supported mime type
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/mp4")
@@ -167,43 +203,12 @@ export default function Composer({
       mediaRecorder.start();
       setIsListening(true);
     } catch (err: any) {
-      console.warn("[Composer] getUserMedia / MediaRecorder notice:", err);
-      // Fallback: If Web Speech is available, attempt it
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        try {
-          const recognition = new SpeechRecognition();
-          recognition.continuous = false;
-          recognition.interimResults = true;
-          recognition.lang = "en-US";
-
-          recognition.onstart = () => setIsListening(true);
-          recognition.onend = () => setIsListening(false);
-          recognition.onerror = () => setIsListening(false);
-
-          recognition.onresult = (event: any) => {
-            let transcript = "";
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-              if (event.results[i].isFinal) {
-                transcript += event.results[i][0].transcript + " ";
-              }
-            }
-            if (transcript) {
-              setText((prev) => (prev ? prev + " " + transcript.trim() : transcript.trim()));
-            }
-          };
-
-          recognitionRef.current = recognition;
-          recognition.start();
-          return;
-        } catch {}
-      }
-
+      console.warn("[Composer] getUserMedia notice:", err);
       alert("Please allow microphone access in your browser settings to use voice typing.");
       setIsListening(false);
     }
   };
+
 
   function toggleVoiceInput() {
     if (isListening) {

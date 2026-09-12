@@ -247,27 +247,9 @@ export default function VoiceCallModal({
           const avg = sum / dataArray.length;
           const normalized = Math.min(1, Math.max(0, avg / 128));
 
-          // Real-time audio reactive level
+          // Real-time audio reactive visualizer level
           if (!isMutedRef.current && !isSpeakingRef.current) {
             setAudioLevel(normalized);
-
-            // Voice Activity Detection for Mobile / Server STT
-            if (normalized > 0.08) {
-              hasSpokenInTurnRef.current = true;
-              if (silenceTimerRef.current) {
-                clearTimeout(silenceTimerRef.current);
-                silenceTimerRef.current = null;
-              }
-            } else if (hasSpokenInTurnRef.current && normalized < 0.04) {
-              if (!silenceTimerRef.current) {
-                silenceTimerRef.current = setTimeout(() => {
-                  silenceTimerRef.current = null;
-                  if (hasSpokenInTurnRef.current && !isSpeakingRef.current && !isMutedRef.current) {
-                    transcribeCurrentAudioChunk();
-                  }
-                }, 850);
-              }
-            }
           } else if (isSpeakingRef.current) {
             setAudioLevel(0.35 + Math.sin(Date.now() / 130) * 0.25);
           } else {
@@ -277,6 +259,7 @@ export default function VoiceCallModal({
           animFrameRef.current = requestAnimationFrame(updateLevel);
         };
 
+
         animFrameRef.current = requestAnimationFrame(updateLevel);
       }
     } catch (err: any) {
@@ -285,7 +268,7 @@ export default function VoiceCallModal({
         setMicPermissionError("Microphone permission was denied. Please enable mic access in your browser settings.");
       }
     }
-  }, [transcribeCurrentAudioChunk]);
+  }, []);
 
   // Text-to-speech synthesis helper
   const speak = useCallback((text: string, onComplete?: () => void) => {
@@ -416,12 +399,13 @@ export default function VoiceCallModal({
           setTranscript(trimmed);
           hasSpokenInTurnRef.current = true;
 
-          // Fast 750ms silence debounce for snappy, human-speed turn taking
+          // Natural 1100ms silence debounce so user isn't cut off during brief pauses
           if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = setTimeout(() => {
             audioChunksRef.current = []; // cleared since Web Speech transcribed it
             handleUserSpokeRef.current(trimmed);
-          }, 750);
+          }, 1100);
+
         }
       };
 

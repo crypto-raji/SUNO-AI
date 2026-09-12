@@ -34,6 +34,7 @@ export async function transcribeAudioData(
       const response = await groq.audio.transcriptions.create({
         file: uploadFile,
         model: "whisper-large-v3-turbo",
+        language: "en",
         response_format: "json",
         temperature: 0.0,
       });
