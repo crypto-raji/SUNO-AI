@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --font-display: "Fraunces", Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-heading: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+  background-color: #0b0c10;
+  color: #f5f3ee;
+  font-family: var(--font-body);
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-ink-800/60 backdrop-blur-glass border border-line shadow-glass rounded-xl2;
+  }
+
+  .glass-button {
+    @apply bg-ink-700/70 hover:bg-ink-600/70 border border-line rounded-full px-4 py-2
+      text-sm text-paper-100 transition-colors duration-150;
+  }
+
+  .action-chip {
+    @apply glass-button text-paper-200 hover:text-paper-100 hover:border-signal/40
+      hover:bg-signal/10;
+  }
+}
+
+/* ChatGPT / Gemini style sleek scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(237, 234, 226, 0.12);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(237, 234, 226, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
