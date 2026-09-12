@@ -56,32 +56,38 @@ export async function POST(req: NextRequest) {
   try {
     const speech = await synthesizeSpeech({ text, voice });
 
-    await supabase
-      .from("audio_files")
-      .update({
-        status: "ready",
-        audio_url: speech.audioUrl,
-        provider: speech.provider,
-        duration_seconds: speech.durationSeconds ?? null,
-      })
-      .eq("id", audioRow!.id);
+    if (audioRow?.id) {
+      await supabase
+        .from("audio_files")
+        .update({
+          status: "ready",
+          audio_url: speech.audioUrl,
+          provider: speech.provider,
+          duration_seconds: speech.durationSeconds ?? null,
+        })
+        .eq("id", audioRow.id);
+    }
 
-    await logUsage({ userId: user.id, service: "tts", characters: text.length });
+    await logUsage({ userId: user.id, service: "tts", characters: text.length }).catch(() => {});
 
     return NextResponse.json({
-      audio: { ...audioRow, status: "ready", audio_url: speech.audioUrl },
+      audio: { ...(audioRow || {}), status: "ready", audio_url: speech.audioUrl },
       status: "ready",
     });
   } catch (err) {
     if (err instanceof TTSNotConfiguredError) {
-      await supabase.from("audio_files").update({ status: "not_configured" }).eq("id", audioRow!.id);
+      if (audioRow?.id) {
+        await supabase.from("audio_files").update({ status: "not_configured" }).eq("id", audioRow.id);
+      }
       return NextResponse.json({ audio: audioRow, status: "not_configured" });
     }
 
-    await supabase
-      .from("audio_files")
-      .update({ status: "failed", error_message: "generation_failed" })
-      .eq("id", audioRow!.id);
+    if (audioRow?.id) {
+      await supabase
+        .from("audio_files")
+        .update({ status: "failed", error_message: "generation_failed" })
+        .eq("id", audioRow.id);
+    }
 
     return NextResponse.json({ error: "The audio generation failed. Please try again." }, { status: 500 });
   }

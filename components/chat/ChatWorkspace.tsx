@@ -90,19 +90,26 @@ export default function ChatWorkspace({ initialMode }: { initialMode: Mode }) {
 
   async function ensureSession(seed: string): Promise<string> {
     if (sessionId) return sessionId;
-    const res = await fetch("/api/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode, seed }),
-    });
-    const data = await res.json();
-    createdSessionIdRef.current = data.session.id;
-    setSessionId(data.session.id);
-    window.history.replaceState(null, "", `?session=${data.session.id}`);
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("sona:session-created", { detail: { session: data.session } }));
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, seed }),
+      });
+      const data = await res.json();
+      const newId = data?.session?.id || nanoid();
+      createdSessionIdRef.current = newId;
+      setSessionId(newId);
+      window.history.replaceState(null, "", `?session=${newId}`);
+      if (typeof window !== "undefined" && data?.session) {
+        window.dispatchEvent(new CustomEvent("sona:session-created", { detail: { session: data.session } }));
+      }
+      return newId;
+    } catch {
+      const localId = nanoid();
+      setSessionId(localId);
+      return localId;
     }
-    return data.session.id;
   }
 
   async function handleSend(text: string, file: File | null) {

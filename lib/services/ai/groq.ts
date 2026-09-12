@@ -47,11 +47,12 @@ export const groqProvider: AIProvider = {
   },
 
   async complete(request: AICompletionRequest): Promise<AICompletionResult> {
-    if (!this.isConfigured()) {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
       throw new Error("GROQ_NOT_CONFIGURED");
     }
 
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    const groq = new Groq({ apiKey });
 
     const messages = [
       ...(request.system ? [{ role: "system" as const, content: request.system }] : []),

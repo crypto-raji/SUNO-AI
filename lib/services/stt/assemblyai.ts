@@ -13,10 +13,11 @@ export function isSTTConfigured(): boolean {
 }
 
 function getClient(): AssemblyAI {
-  if (!isSTTConfigured()) {
+  const apiKey = process.env.ASSEMBLYAI_API_KEY;
+  if (!apiKey) {
     throw new Error("STT_NOT_CONFIGURED");
   }
-  return new AssemblyAI({ apiKey: process.env.ASSEMBLYAI_API_KEY! });
+  return new AssemblyAI({ apiKey });
 }
 
 /**

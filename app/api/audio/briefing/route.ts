@@ -93,22 +93,26 @@ export async function POST(req: NextRequest) {
   try {
     const speech = await synthesizeSpeech({ text: narration });
 
-    await supabase
-      .from("audio_files")
-      .update({
-        status: "ready",
-        audio_url: speech.audioUrl,
-        provider: speech.provider,
-        duration_seconds: speech.durationSeconds ?? null,
-      })
-      .eq("id", audioRow!.id);
+    if (audioRow?.id) {
+      await supabase
+        .from("audio_files")
+        .update({
+          status: "ready",
+          audio_url: speech.audioUrl,
+          provider: speech.provider,
+          duration_seconds: speech.durationSeconds ?? null,
+        })
+        .eq("id", audioRow.id);
+    }
 
-    await logUsage({ userId: user.id, service: "tts", characters: narration.length });
+    await logUsage({ userId: user.id, service: "tts", characters: narration.length }).catch(() => {});
 
-    return NextResponse.json({ audio: { ...audioRow, status: "ready", audio_url: speech.audioUrl }, status: "ready" });
+    return NextResponse.json({ audio: { ...(audioRow || {}), status: "ready", audio_url: speech.audioUrl }, status: "ready" });
   } catch (err) {
     const status = err instanceof TTSNotConfiguredError ? "not_configured" : "failed";
-    await supabase.from("audio_files").update({ status }).eq("id", audioRow!.id);
+    if (audioRow?.id) {
+      await supabase.from("audio_files").update({ status }).eq("id", audioRow.id);
+    }
     return NextResponse.json({ audio: audioRow, status });
   }
 }

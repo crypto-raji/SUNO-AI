@@ -35,19 +35,23 @@ export async function POST(req: NextRequest) {
   try {
     const result = await transcribeAudio(audioUrl);
 
-    await supabase
-      .from("transcripts")
-      .update({ status: "ready", transcript_text: result.text })
-      .eq("id", transcriptRow!.id);
+    if (transcriptRow?.id) {
+      await supabase
+        .from("transcripts")
+        .update({ status: "ready", transcript_text: result.text })
+        .eq("id", transcriptRow.id);
+    }
 
-    await logUsage({ userId: user.id, service: "stt_assemblyai", characters: result.text.length });
+    await logUsage({ userId: user.id, service: "stt_assemblyai", characters: result.text.length }).catch(() => {});
 
     return NextResponse.json({ transcript: result.text });
   } catch {
-    await supabase
-      .from("transcripts")
-      .update({ status: "failed", error_message: "transcription_failed" })
-      .eq("id", transcriptRow!.id);
+    if (transcriptRow?.id) {
+      await supabase
+        .from("transcripts")
+        .update({ status: "failed", error_message: "transcription_failed" })
+        .eq("id", transcriptRow.id);
+    }
 
     return NextResponse.json({ error: "We couldn't transcribe that audio. Please try again." }, { status: 500 });
   }
