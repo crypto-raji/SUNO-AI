@@ -509,7 +509,7 @@ export default function HomePage() {
             <Link href="/login" className="hover:text-paper-100 transition-colors">Log In</Link>
           </div>
 
-          <p className="text-xs text-paper-300/60">© {new Date().getFullYear()} Sona AI. All rights reserved.</p>
+          <p className="text-xs text-paper-300/60">© 2026 Sona AI. All rights reserved.</p>
         </div>
       </footer>
     </main>
