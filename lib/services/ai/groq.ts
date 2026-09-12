@@ -3,19 +3,29 @@ import type { AIProvider, AICompletionRequest, AICompletionResult } from "./type
 
 let cachedModels: { models: string[]; timestamp: number } | null = null;
 
-// Verified active, ultra-fast production models on Groq
+// Verified active, fast, and free production models on Groq
 const VERIFIED_MODELS = [
-  "llama-3.3-70b-versatile",
-  "llama-3.1-8b-instant",
-  "llama3-70b-8192",
-  "llama3-8b-8192",
-  "mixtral-8x7b-32768",
-  "gemma2-9b-it",
+  "qwen/qwen3.8-27b",
+  "groq/compound-mini",
+  "openai/gpt-oss-20b",
+  "qwen/qwen3.6-27b",
+  "groq/compound",
+  "openai/gpt-oss-120b",
+];
+
+const NON_CHAT_PATTERNS = [
+  "whisper",
+  "guard",
+  "safeguard",
+  "orpheus",
+  "vision",
+  "audio",
+  "tts",
 ];
 
 async function getActiveGroqModels(groq: Groq): Promise<string[]> {
   const now = Date.now();
-  if (cachedModels && now - cachedModels.timestamp < 10 * 60 * 1000) {
+  if (cachedModels && now - cachedModels.timestamp < 5 * 60 * 1000) {
     return cachedModels.models;
   }
 
@@ -23,8 +33,17 @@ async function getActiveGroqModels(groq: Groq): Promise<string[]> {
     const list = await groq.models.list();
     const availableIds = new Set(list.data.map((m) => m.id));
 
-    // Match verified models that exist on the user's Groq account
+    // First, match verified top models
     const matched = VERIFIED_MODELS.filter((id) => availableIds.has(id));
+
+    // Then, append any other available chat models that aren't safeguard/whisper
+    for (const m of list.data) {
+      const id = m.id.toLowerCase();
+      const isNonChat = NON_CHAT_PATTERNS.some((pattern) => id.includes(pattern));
+      if (!isNonChat && !matched.includes(m.id)) {
+        matched.push(m.id);
+      }
+    }
 
     if (matched.length > 0) {
       cachedModels = { models: matched, timestamp: now };
