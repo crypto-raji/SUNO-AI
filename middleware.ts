@@ -1,34 +1,53 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/", "/about", "/login", "/sign-up"];
 const AUTH_PATHS = ["/login", "/sign-up"];
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } });
-
   const path = request.nextUrl.pathname;
-  const isAuthPath = AUTH_PATHS.includes(path);
-  const requiresAuth =
-    path.startsWith("/app") || path.startsWith("/profile") || path.startsWith("/settings") || path.startsWith("/admin");
 
-  // Fast-path: Check if any Supabase auth cookies exist (e.g. sb-*-auth-token)
+  // 1. Direct pass-through for public landing page, marketing, and public API routes
+  if (path === "/" || path === "/about" || path.startsWith("/api/stt") || path.startsWith("/api/tts")) {
+    return NextResponse.next();
+  }
+
+  const isAuthPath = AUTH_PATHS.includes(path);
+  const isProtectedPath =
+    path.startsWith("/app") ||
+    path.startsWith("/profile") ||
+    path.startsWith("/settings") ||
+    path.startsWith("/admin");
+
+  // Check for presence of any Supabase session cookies
   const hasAuthCookie = request.cookies.getAll().some((c) => c.name.startsWith("sb-"));
 
-  // If visiting public or auth page without any auth cookies, bypass remote network call
+  // 2. Fast-path: If user has no cookies:
   if (!hasAuthCookie) {
-    if (requiresAuth) {
+    if (isProtectedPath) {
       const redirectUrl = new URL("/login", request.url);
       redirectUrl.searchParams.set("next", path);
       return NextResponse.redirect(redirectUrl);
     }
-    return response;
+    // Public or auth path without cookies — allow through
+    return NextResponse.next();
   }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  // 3. User has cookies, verify session safely
+  let response = NextResponse.next({ request: { headers: request.headers } });
+
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      // Missing env vars fallback: don't crash or loop
+      if (isProtectedPath) {
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
+      return response;
+    }
+
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         get(name: string) {
           return request.cookies.get(name)?.value;
@@ -42,26 +61,40 @@ export async function middleware(request: NextRequest) {
           response.cookies.set({ name, value: "", ...options });
         },
       },
+    });
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (isProtectedPath && !user) {
+      const redirectUrl = new URL("/login", request.url);
+      redirectUrl.searchParams.set("next", path);
+      return NextResponse.redirect(redirectUrl);
     }
-  );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (requiresAuth && !user) {
-    const redirectUrl = new URL("/login", request.url);
-    redirectUrl.searchParams.set("next", path);
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  if (isAuthPath && user) {
-    return NextResponse.redirect(new URL("/app", request.url));
+    if (isAuthPath && user) {
+      return NextResponse.redirect(new URL("/app", request.url));
+    }
+  } catch {
+    // If auth verification fails, redirect only protected routes
+    if (isProtectedPath) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - images, icons, and static assets (.png, .jpg, .svg, etc.)
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp3|wav|ogg)$).*)",
+  ],
 };
